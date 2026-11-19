@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>12-Month Profit Calendar</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --win-bg: rgba(16, 185, 129, 0.18);
+      --win-text: #34d399;
+      --loss-bg: rgba(239, 68, 68, 0.18);
+      --loss-text: #f87171;
+      --flat-bg: rgba(148, 163, 184, 0.12);
+      --flat-text: #cbd5e1;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; padding: 20px; background: var(--bg); color: var(--text); }
+    
+    .header { max-width: 1440px; margin: 0 auto 24px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; }
+    .header h1 { margin: 0; font-size: 1.5rem; }
+    .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    select, button { background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 0.95rem; }
+    button:hover { background: #2d3b52; }
+    .sync-status { font-size: 0.82rem; color: var(--muted); }
+    
+    .stats-bar { max-width: 1440px; margin: 0 auto 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .stat-box { background: var(--card); border: 1px solid var(--border); padding: 16px; border-radius: 12px; }
+    .stat-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    .stat-value { font-size: 1.4rem; font-weight: 700; }
+
+    .calendar-grid { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+    .month-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .month-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .month-title { font-weight: 700; font-size: 1.1rem; }
+    .month-total { font-weight: 600; font-size: 0.95rem; }
+
+    .weekdays, .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+    .weekdays div { font-size: 0.75rem; color: var(--muted); padding-bottom: 6px; font-weight: 600; }
+    .day-cell { min-height: 48px; background: rgba(15, 23, 42, 0.5); border-radius: 6px; padding: 4px 2px; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid transparent; transition: all 0.2s ease; }
+    .day-cell.empty { background: transparent; }
+    .day-num { font-size: 0.72rem; color: var(--muted); text-align: right; padding-right: 4px; }
+    .day-pnl { font-size: 0.75rem; font-weight: 700; word-break: break-all; }
+
+    .win { background: var(--win-bg); border-color: rgba(52, 211, 153, 0.3); }
+    .win .day-pnl, .text-win { color: var(--win-text); }
+    .loss { background: var(--loss-bg); border-color: rgba(248, 113, 113, 0.3); }
+    .loss .day-pnl, .text-loss { color: var(--loss-text); }
+    .flat { background: var(--flat-bg); border-color: rgba(148, 163, 184, 0.25); }
+    .flat .day-pnl { color: var(--flat-text); }
+
+    #loader { text-align: center; padding: 40px; color: var(--muted); font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>📊 Profit Calendar (12 Months)</h1>
+    <div class="controls">
+      <span class="sync-status" id="syncStatus">กำลังเชื่อมต่อ...</span>
+      <label for="yearSelect" style="color: var(--muted); font-size: 0.9rem;">ปี (Year):</label>
+      <select id="yearSelect" onchange="renderCalendar()"></select>
+      <button onclick="fetchData(false)">🔄 รีเฟรชทันที</button>
+    </div>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-box">
+      <div class="stat-label">กำไร/ขาดทุนสุทธิทั้งปี (Net P&L)</div>
+      <div class="stat-value" id="yearlyNet">0.00</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label" id="currentMonthLabel">กำไรเดือนนี้ (Current Month)</div>
+      <div class="stat-value" id="currentMonthNet">0.00</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label" id="lastMonthLabel">กำไรเดือนที่ผ่านมา (Last Month)</div>
+      <div class="stat-value" id="lastMonthNet">0.00</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">อัตราชนะรายวัน (Win Rate)</div>
+      <div class="stat-value" id="winRate">0%</div>
+    </div>
+  </div>
+
+  <div id="loader">กำลังโหลดข้อมูลจาก Google Sheets...</div>
+  <div class="calendar-grid" id="calendarGrid"></div>
+
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbzFnVEzgpcH4yC2vrTVmgNJwEysyprJJ4y6HHXWgVf-6lN25v52v1XmQpAVAUDq0Br4/exec";
+
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+    let sheetData = {};
+    let isFirstLoad = true;
+
+    function initYearSelector() {
+      const select = document.getElementById("yearSelect");
+      const currentYear = new Date().getFullYear();
+      for (let y = currentYear - 1; y <= currentYear + 1; y++) {
+        const opt = document.createElement("option");
+        opt.value = y;
+        opt.textContent = y;
+        if (y === currentYear) opt.selected = true;
+        select.appendChild(opt);
+      }
+    }
+
+    async function fetchData(isBackground = false) {
+      const loader = document.getElementById("loader");
+      const statusEl = document.getElementById("syncStatus");
+
+      if (!isBackground && isFirstLoad) {
+        loader.style.display = "block";
+      }
+      statusEl.textContent = "⏳ กำลังซิงค์...";
+
+      try {
+        const noCacheUrl = `${API_URL}?t=${Date.now()}`;
+        const response = await fetch(noCacheUrl);
+        sheetData = await response.json();
+
+        loader.style.display = "none";
+        isFirstLoad = false;
+        renderCalendar();
+
+        const nowTime = new Date().toLocaleTimeString("th-TH");
+        statusEl.textContent = `🟢 อัปเดตล่าสุด: ${nowTime}`;
+      } catch (error) {
+        if (isFirstLoad) {
+          loader.innerHTML = "❌ โหลดข้อมูลไม่สำเร็จ กรุณาตรวจสอบ URL ของ Web App หรือสิทธิ์การเข้าถึง (Anyone)";
+        }
+        statusEl.textContent = "🔴 ซิงค์ไม่สำเร็จ (จะลองใหม่ใน 15 วิ)";
+        console.error(error);
+      }
+    }
+
+    function formatNum(num) {
+      const sign = num > 0 ? "+" : "";
+      return sign + num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function renderCalendar() {
+      const selectedYear = parseInt(document.getElementById("yearSelect").value);
+      const currentMonthIndex = new Date().getMonth();
+      
+      // คำนวณเดือนที่ผ่านมา (รองรับกรณีเดือน Jan ย้อนกลับไป Dec ปีก่อนหน้า)
+      const prevMonthIndex = currentMonthIndex === 0 ? 11 : currentMonthIndex - 1;
+      const prevMonthYear = currentMonthIndex === 0 ? selectedYear - 1 : selectedYear;
+
+      const grid = document.getElementById("calendarGrid");
+      grid.innerHTML = "";
+
+      let yearlyTotal = 0;
+      let currentMonthTotal = 0;
+      let totalWins = 0;
+      let totalLosses = 0;
+
+      MONTHS.forEach((monthName, monthIndex) => {
+        const monthMap = sheetData[monthName] || {};
+        const firstDay = new Date(selectedYear, monthIndex, 1).getDay();
+        const daysInMonth = new Date(selectedYear, monthIndex + 1, 0).getDate();
+
+        let monthTotal = 0;
+        let daysHTML = "";
+
+        for (let i = 0; i < firstDay; i++) {
+          daysHTML += `<div class="day-cell empty"></div>`;
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const mm = String(monthIndex + 1).padStart(2, "0");
+          const dd = String(day).padStart(2, "0");
+          const dateKey = `${selectedYear}-${mm}-${dd}`;
+
+          const val = monthMap[dateKey];
+          let statusClass = "";
+          let pnlText = "-";
+
+          if (val !== undefined) {
+            monthTotal += val;
+            yearlyTotal += val;
+            pnlText = formatNum(val);
+
+            if (val > 0) {
+              statusClass = "win";
+              totalWins++;
+            } else if (val < 0) {
+              statusClass = "loss";
+              totalLosses++;
+            } else {
+              statusClass = "flat";
+            }
+          }
+
+          daysHTML += `
+            <div class="day-cell ${statusClass}" title="${dateKey}: ${pnlText}">
+              <div class="day-num">${day}</div>
+              <div class="day-pnl">${pnlText}</div>
+            </div>
+          `;
+        }
+
+        if (monthIndex === currentMonthIndex) {
+          currentMonthTotal = monthTotal;
+        }
+
+        const monthColorClass = monthTotal > 0 ? "text-win" : (monthTotal < 0 ? "text-loss" : "");
+
+        const cardHTML = `
+          <div class="month-card">
+            <div class="month-header">
+              <span class="month-title">${monthName} ${selectedYear}</span>
+              <span class="month-total ${monthColorClass}">${formatNum(monthTotal)}</span>
+            </div>
+            <div class="weekdays">
+              ${WEEKDAYS.map(d => `<div>${d}</div>`).join("")}
+            </div>
+            <div class="days">
+              ${daysHTML}
+            </div>
+          </div>
+        `;
+        grid.insertAdjacentHTML("beforeend", cardHTML);
+      });
+
+      // คำนวณยอดรวมของเดือนที่ผ่านมาจากข้อมูลทั้งหมด
+      const prevMonthName = MONTHS[prevMonthIndex];
+      const prevMonthMap = sheetData[prevMonthName] || {};
+      const prevMonthPrefix = `${prevMonthYear}-${String(prevMonthIndex + 1).padStart(2, "0")}-`;
+      let lastMonthTotal = 0;
+      Object.keys(prevMonthMap).forEach(dateKey => {
+        if (dateKey.startsWith(prevMonthPrefix)) {
+          lastMonthTotal += prevMonthMap[dateKey];
+        }
+      });
+
+      // อัปเดตกล่องสรุปทั้งปี
+      const netEl = document.getElementById("yearlyNet");
+      netEl.textContent = formatNum(yearlyTotal);
+      netEl.className = "stat-value " + (yearlyTotal > 0 ? "text-win" : (yearlyTotal < 0 ? "text-loss" : ""));
+
+      // อัปเดตกล่องกำไรเดือนนี้
+      document.getElementById("currentMonthLabel").textContent = `กำไรเดือนนี้ (${MONTHS[currentMonthIndex]} ${selectedYear})`;
+      const cmEl = document.getElementById("currentMonthNet");
+      cmEl.textContent = formatNum(currentMonthTotal);
+      cmEl.className = "stat-value " + (currentMonthTotal > 0 ? "text-win" : (currentMonthTotal < 0 ? "text-loss" : ""));
+
+      // อัปเดตกล่องกำไรเดือนที่ผ่านมา
+      document.getElementById("lastMonthLabel").textContent = `กำไรเดือนที่ผ่านมา (${prevMonthName} ${prevMonthYear})`;
+      const lmEl = document.getElementById("lastMonthNet");
+      lmEl.textContent = formatNum(lastMonthTotal);
+      lmEl.className = "stat-value " + (lastMonthTotal > 0 ? "text-win" : (lastMonthTotal < 0 ? "text-loss" : ""));
+
+      // อัปเดต Win Rate
+      const totalActiveDays = totalWins + totalLosses;
+      const winRate = totalActiveDays > 0 ? ((totalWins / totalActiveDays) * 100).toFixed(1) : 0;
+      document.getElementById("winRate").textContent = `${winRate}%`;
+    }
+
+    initYearSelector();
+    fetchData(false);
+
+    // อัปเดตอัตโนมัติทุกๆ 15 วินาที
+    setInterval(() => fetchData(true), 15000);
+  </script>
+</body>
+</html>
