@@ -78,8 +78,8 @@
       <div class="stat-value" id="currentMonthNet">0.00</div>
     </div>
     <div class="stat-box">
-      <div class="stat-label" id="lastMonthLabel">กำไรเดือนที่ผ่านมา (Last Month)</div>
-      <div class="stat-value" id="lastMonthNet">0.00</div>
+      <div class="stat-label" id="todayLabel">กำไรวันนี้ (Today P&L)</div>
+      <div class="stat-value" id="todayNet">0.00</div>
     </div>
     <div class="stat-box">
       <div class="stat-label">อัตราชนะรายวัน (Win Rate)</div>
@@ -101,7 +101,8 @@
     function initYearSelector() {
       const select = document.getElementById("yearSelect");
       const currentYear = new Date().getFullYear();
-      for (let y = currentYear - 1; y <= currentYear + 1; y++) {
+      // กำหนดช่วงปีตั้งแต่ 2026 ถึง 2036
+      for (let y = 2026; y <= 2036; y++) {
         const opt = document.createElement("option");
         opt.value = y;
         opt.textContent = y;
@@ -146,11 +147,13 @@
 
     function renderCalendar() {
       const selectedYear = parseInt(document.getElementById("yearSelect").value);
-      const currentMonthIndex = new Date().getMonth();
+      const now = new Date();
+      const currentMonthIndex = now.getMonth();
+      const actualCurrentYear = now.getFullYear();
       
-      // คำนวณเดือนที่ผ่านมา (รองรับกรณีเดือน Jan ย้อนกลับไป Dec ปีก่อนหน้า)
-      const prevMonthIndex = currentMonthIndex === 0 ? 11 : currentMonthIndex - 1;
-      const prevMonthYear = currentMonthIndex === 0 ? selectedYear - 1 : selectedYear;
+      // สร้าง Key ของวันที่ปัจจุบัน (เช่น 2026-11-20)
+      const todayKey = `${actualCurrentYear}-${String(currentMonthIndex + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const todayMonthName = MONTHS[currentMonthIndex];
 
       const grid = document.getElementById("calendarGrid");
       grid.innerHTML = "";
@@ -228,16 +231,10 @@
         grid.insertAdjacentHTML("beforeend", cardHTML);
       });
 
-      // คำนวณยอดรวมของเดือนที่ผ่านมาจากข้อมูลทั้งหมด
-      const prevMonthName = MONTHS[prevMonthIndex];
-      const prevMonthMap = sheetData[prevMonthName] || {};
-      const prevMonthPrefix = `${prevMonthYear}-${String(prevMonthIndex + 1).padStart(2, "0")}-`;
-      let lastMonthTotal = 0;
-      Object.keys(prevMonthMap).forEach(dateKey => {
-        if (dateKey.startsWith(prevMonthPrefix)) {
-          lastMonthTotal += prevMonthMap[dateKey];
-        }
-      });
+      // ดึงยอดกำไร/ขาดทุนของวันนี้
+      const todayVal = (sheetData[todayMonthName] && sheetData[todayMonthName][todayKey] !== undefined) 
+        ? sheetData[todayMonthName][todayKey] 
+        : 0;
 
       // อัปเดตกล่องสรุปทั้งปี
       const netEl = document.getElementById("yearlyNet");
@@ -250,11 +247,11 @@
       cmEl.textContent = formatNum(currentMonthTotal);
       cmEl.className = "stat-value " + (currentMonthTotal > 0 ? "text-win" : (currentMonthTotal < 0 ? "text-loss" : ""));
 
-      // อัปเดตกล่องกำไรเดือนที่ผ่านมา
-      document.getElementById("lastMonthLabel").textContent = `กำไรเดือนที่ผ่านมา (${prevMonthName} ${prevMonthYear})`;
-      const lmEl = document.getElementById("lastMonthNet");
-      lmEl.textContent = formatNum(lastMonthTotal);
-      lmEl.className = "stat-value " + (lastMonthTotal > 0 ? "text-win" : (lastMonthTotal < 0 ? "text-loss" : ""));
+      // อัปเดตกล่องกำไรวันนี้
+      document.getElementById("todayLabel").textContent = `กำไรวันนี้ (${todayKey})`;
+      const tdEl = document.getElementById("todayNet");
+      tdEl.textContent = formatNum(todayVal);
+      tdEl.className = "stat-value " + (todayVal > 0 ? "text-win" : (todayVal < 0 ? "text-loss" : ""));
 
       // อัปเดต Win Rate
       const totalActiveDays = totalWins + totalLosses;
