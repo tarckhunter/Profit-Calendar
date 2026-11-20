@@ -91,7 +91,7 @@
   <div class="calendar-grid" id="calendarGrid"></div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbzFnVEzgpcH4yC2vrTVmgNJwEysyprJJ4y6HHXWgVf-6lN25v52v1XmQpAVAUDq0Br4/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbyo_zxjIQ-91GuN39tJagPSIsiDpx2GOsQ7M6vcXkL1h8vAQGP6FtseeCZ49kmMWJbj/exec";
 
     const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
@@ -100,7 +100,8 @@
 
     function initYearSelector() {
       const select = document.getElementById("yearSelect");
-      const currentYear = new Date().getFullYear();
+      // ลบเวลาออก 4 ชั่วโมง เพื่อให้ตัดปีใหม่ตอน 04:00 น. ตรงกัน
+      const currentYear = new Date(Date.now() - (4 * 60 * 60 * 1000)).getFullYear();
       // กำหนดช่วงปีตั้งแต่ 2026 ถึง 2036
       for (let y = 2026; y <= 2036; y++) {
         const opt = document.createElement("option");
@@ -147,11 +148,12 @@
 
     function renderCalendar() {
       const selectedYear = parseInt(document.getElementById("yearSelect").value);
-      const now = new Date();
+      // ลบเวลาออก 4 ชั่วโมง เพื่อให้ตัดวันใหม่ตอน 04:00 น. ตรงกับ Apps Script
+      const now = new Date(Date.now() - (4 * 60 * 60 * 1000));
       const currentMonthIndex = now.getMonth();
       const actualCurrentYear = now.getFullYear();
       
-      // สร้าง Key ของวันที่ปัจจุบัน (เช่น 2026-11-20)
+      // สร้าง Key ของวันที่ปัจจุบัน (ตัดวันตอน 04:00 น.)
       const todayKey = `${actualCurrentYear}-${String(currentMonthIndex + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const todayMonthName = MONTHS[currentMonthIndex];
 
