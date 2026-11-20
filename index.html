@@ -120,7 +120,7 @@
   <div class="calendar-grid" id="calendarGrid"></div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbyo_zxjIQ-91GuN39tJagPSIsiDpx2GOsQ7M6vcXkL1h8vAQGP6FtseeCZ49kmMWJbj/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbwYSWwNeQnazJw3OUuyq4rqix8i1aXxtFrggvO6rvUy3MhegC5p0wwmjhDd7Mr-oA28/exec";
 
     const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
@@ -129,9 +129,9 @@
 
     function initYearSelector() {
       const select = document.getElementById("yearSelect");
-      const shiftedNow = new Date(Date.now() - (4 * 60 * 60 * 1000));
-      const currentYear = shiftedNow.getFullYear();
-      const currentMonth = shiftedNow.getMonth();
+      const now = new Date(); // ใช้เวลาปัจจุบันตรง ๆ (ตัดวันหลัง 23:59 น.)
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
 
       for (let y = 2026; y <= 2036; y++) {
         const opt = document.createElement("option");
@@ -197,12 +197,11 @@
       const isSingleMode = document.getElementById("singleMonthToggle").checked;
       const selectedMonthIndex = parseInt(document.getElementById("monthSelect").value);
 
-      // ลบเวลาออก 4 ชั่วโมง เพื่อให้ตัดวันใหม่ตอน 04:00 น. ตรงกับ Apps Script
-      const now = new Date(Date.now() - (4 * 60 * 60 * 1000));
+      const now = new Date(); // ใช้เวลาปัจจุบันตรง ๆ (ตัดวันหลัง 23:59 น.)
       const currentMonthIndex = now.getMonth();
       const actualCurrentYear = now.getFullYear();
       
-      // สร้าง Key ของวันที่ปัจจุบัน (ตัดวันตอน 04:00 น.)
+      // สร้าง Key ของวันที่ปัจจุบัน
       const todayKey = `${actualCurrentYear}-${String(currentMonthIndex + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const todayMonthName = MONTHS[currentMonthIndex];
 
