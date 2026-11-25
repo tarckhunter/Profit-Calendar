@@ -70,6 +70,52 @@
     .flat { background: var(--flat-bg); border-color: rgba(148, 163, 184, 0.25); }
     .flat .day-pnl { color: var(--flat-text); }
 
+    /* สไตล์กล่อง Data Week Evaluation ด้านล่างตารางเฉพาะโหมดเดือนเดียว */
+    .week-eval-section {
+      max-width: 820px;
+      margin: 20px auto 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .week-eval-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .week-eval-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 400;
+    }
+    .week-eval-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      gap: 10px;
+    }
+    .week-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 10px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .week-box.win { background: var(--win-bg); border-color: rgba(52, 211, 153, 0.35); }
+    .week-box.loss { background: var(--loss-bg); border-color: rgba(248, 113, 113, 0.35); }
+    .week-box.flat { background: var(--flat-bg); border-color: rgba(148, 163, 184, 0.3); }
+    .week-title { font-size: 0.85rem; font-weight: 700; color: var(--text); }
+    .week-range { font-size: 0.72rem; color: var(--muted); }
+    .week-pnl { font-size: 1.05rem; font-weight: 800; margin-top: 2px; }
+
     /* RPG Item Tooltip สไตล์หน้าต่างข้อมูลไอเทมในเกม */
     .game-tooltip {
       position: fixed;
@@ -173,6 +219,9 @@
   <div id="loader">กำลังโหลดข้อมูลจาก Profit Calendar...</div>
   <div class="calendar-grid" id="calendarGrid"></div>
 
+  <!-- ส่วนแสดงผล Data Week Evaluation (แสดงเฉพาะโหมดเฉพาะเดือนเดียว) -->
+  <div id="weekEvaluationContainer" style="display: none;"></div>
+
   <!-- หน้าต่าง Tooltip สไตล์ไอเทมในเกม -->
   <div id="gameTooltip" class="game-tooltip"></div>
 
@@ -249,6 +298,89 @@
       return sign + num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    // ฟังก์ชันคำนวณ Data Week Evaluation (ตัดรอบสัปดาห์ทุกวันอาทิตย์: จันทร์-อาทิตย์)
+    function renderWeekEvaluation(year, monthIndex, monthName, monthMap) {
+      const container = document.getElementById("weekEvaluationContainer");
+      const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+      const mm = String(monthIndex + 1).padStart(2, "0");
+
+      const weeks = [];
+      let currentWeekSum = 0;
+      let hasDataInWeek = false;
+      let startDay = 1;
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateObj = new Date(year, monthIndex, day);
+        const dow = dateObj.getDay(); // 0 = อาทิตย์, 1 = จันทร์, ..., 5 = ศุกร์, 6 = เสาร์
+        const dd = String(day).padStart(2, "0");
+        const dateKey = `${year}-${mm}-${dd}`;
+        const val = monthMap[dateKey];
+
+        if (val !== undefined) {
+          currentWeekSum += val;
+          hasDataInWeek = true;
+        }
+
+        // จบสัปดาห์เมื่อถึงวันอาทิตย์ (dow === 0) หรือเป็นวันสุดท้ายของเดือน
+        if (dow === 0 || day === daysInMonth) {
+          weeks.push({
+            weekNum: weeks.length + 1,
+            startDay: startDay,
+            endDay: day,
+            sum: Number(currentWeekSum.toFixed(2)),
+            hasData: hasDataInWeek
+          });
+          currentWeekSum = 0;
+          hasDataInWeek = false;
+          startDay = day + 1;
+        }
+      }
+
+      const boxesHTML = weeks.map(w => {
+        let statusClass = "";
+        let colorClass = "";
+        let displayVal = "-";
+
+        if (w.hasData) {
+          displayVal = formatNum(w.sum);
+          if (w.sum > 0) {
+            statusClass = "win";
+            colorClass = "text-win";
+          } else if (w.sum < 0) {
+            statusClass = "loss";
+            colorClass = "text-loss";
+          } else {
+            statusClass = "flat";
+          }
+        }
+
+        const rangeText = w.startDay === w.endDay
+          ? `วันที่ ${w.startDay}`
+          : `วันที่ ${w.startDay}–${w.endDay}`;
+
+        return `
+          <div class="week-box ${statusClass}">
+            <div class="week-title">Week ${w.weekNum}</div>
+            <div class="week-range">${rangeText}</div>
+            <div class="week-pnl ${colorClass}">${displayVal}</div>
+          </div>
+        `;
+      }).join("");
+
+      container.style.display = "block";
+      container.innerHTML = `
+        <div class="week-eval-section">
+          <div class="week-eval-header">
+            <span>📈 Data Week Evaluation (${monthName} ${year})</span>
+            <span class="week-eval-sub">สรุปรายสัปดาห์ (รอบ จันทร์–อาทิตย์)</span>
+          </div>
+          <div class="week-eval-grid">
+            ${boxesHTML}
+          </div>
+        </div>
+      `;
+    }
+
     function renderCalendar() {
       const selectedYear = parseInt(document.getElementById("yearSelect").value);
       const isSingleMode = document.getElementById("singleMonthToggle").checked;
@@ -265,6 +397,12 @@
       const grid = document.getElementById("calendarGrid");
       grid.innerHTML = "";
       grid.className = isSingleMode ? "calendar-grid single-view" : "calendar-grid";
+
+      const weekEvalContainer = document.getElementById("weekEvaluationContainer");
+      if (!isSingleMode) {
+        weekEvalContainer.style.display = "none";
+        weekEvalContainer.innerHTML = "";
+      }
 
       let yearlyTotal = 0;
       let currentMonthTotal = 0;
@@ -340,6 +478,11 @@
             </div>
           `;
           grid.insertAdjacentHTML("beforeend", cardHTML);
+
+          // แสดง Data Week Evaluation ด้านล่างตารางเฉพาะโหมดเดือนเดียว
+          if (isSingleMode) {
+            renderWeekEvaluation(selectedYear, monthIndex, monthName, monthMap);
+          }
         }
       });
 
