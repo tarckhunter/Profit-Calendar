@@ -177,7 +177,7 @@
   <div id="gameTooltip" class="game-tooltip"></div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbzpq4tjVfngRq-kECDTqZtaVJI0Vj9VwRPvrO3Hzc_dO2_XiTmhR4j8wSRIdwGkbMmU/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbyBb8LynF6YG24x2Z7AlqxBjr7fqV2wWEFxYNewQuo1MZRauNyXJU7vc0bGY0ACjSZ6/exec";
 
     const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
@@ -186,7 +186,7 @@
 
     function initYearSelector() {
       const select = document.getElementById("yearSelect");
-      const now = new Date(); // ใช้เวลาปัจจุบันตรง ๆ (ตัดวันหลัง 23:59 น.)
+      const now = new Date(Date.now() - (4 * 60 * 60 * 1000)); // ตัดวันใหม่ตอน 04:00 น.
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth();
 
@@ -254,7 +254,7 @@
       const isSingleMode = document.getElementById("singleMonthToggle").checked;
       const selectedMonthIndex = parseInt(document.getElementById("monthSelect").value);
 
-      const now = new Date(); // ใช้เวลาปัจจุบันตรง ๆ (ตัดวันหลัง 23:59 น.)
+      const now = new Date(Date.now() - (4 * 60 * 60 * 1000)); // ตัดวันใหม่ตอน 04:00 น.
       const currentMonthIndex = now.getMonth();
       const actualCurrentYear = now.getFullYear();
       
