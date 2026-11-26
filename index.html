@@ -83,6 +83,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
       font-weight: 700;
       font-size: 1rem;
       margin-bottom: 14px;
@@ -96,7 +98,7 @@
     }
     .week-eval-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
       gap: 10px;
     }
     .week-box {
@@ -108,13 +110,28 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .week-box:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.45);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
     }
     .week-box.win { background: var(--win-bg); border-color: rgba(52, 211, 153, 0.35); }
     .week-box.loss { background: var(--loss-bg); border-color: rgba(248, 113, 113, 0.35); }
     .week-box.flat { background: var(--flat-bg); border-color: rgba(148, 163, 184, 0.3); }
-    .week-title { font-size: 0.85rem; font-weight: 700; color: var(--text); }
+    .week-title { font-size: 0.88rem; font-weight: 700; color: var(--text); }
     .week-range { font-size: 0.72rem; color: var(--muted); }
-    .week-pnl { font-size: 1.05rem; font-weight: 800; margin-top: 2px; }
+    .week-pnl { font-size: 1.08rem; font-weight: 800; margin-top: 2px; }
+    .week-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 4px;
+      padding-top: 4px;
+      border-top: 1px dashed rgba(148, 163, 184, 0.22);
+    }
 
     /* RPG Item Tooltip สไตล์หน้าต่างข้อมูลไอเทมในเกม */
     .game-tooltip {
@@ -307,6 +324,9 @@
       const weeks = [];
       let currentWeekSum = 0;
       let hasDataInWeek = false;
+      let winDays = 0;
+      let lossDays = 0;
+      let tradedDays = 0;
       let startDay = 1;
 
       for (let day = 1; day <= daysInMonth; day++) {
@@ -319,6 +339,9 @@
         if (val !== undefined) {
           currentWeekSum += val;
           hasDataInWeek = true;
+          tradedDays++;
+          if (val > 0) winDays++;
+          else if (val < 0) lossDays++;
         }
 
         // จบสัปดาห์เมื่อถึงวันอาทิตย์ (dow === 0) หรือเป็นวันสุดท้ายของเดือน
@@ -328,10 +351,16 @@
             startDay: startDay,
             endDay: day,
             sum: Number(currentWeekSum.toFixed(2)),
-            hasData: hasDataInWeek
+            hasData: hasDataInWeek,
+            winDays: winDays,
+            lossDays: lossDays,
+            tradedDays: tradedDays
           });
           currentWeekSum = 0;
           hasDataInWeek = false;
+          winDays = 0;
+          lossDays = 0;
+          tradedDays = 0;
           startDay = day + 1;
         }
       }
@@ -340,9 +369,15 @@
         let statusClass = "";
         let colorClass = "";
         let displayVal = "-";
+        let metaText = "ไม่มีรายการเทรด";
+        const rawValAttr = w.hasData ? w.sum : "none";
 
         if (w.hasData) {
           displayVal = formatNum(w.sum);
+          const activeDays = w.winDays + w.lossDays;
+          const wr = activeDays > 0 ? ((w.winDays / activeDays) * 100).toFixed(0) : 0;
+          metaText = `เทรด ${w.tradedDays} วัน | W:${w.winDays} L:${w.lossDays} (${wr}%)`;
+
           if (w.sum > 0) {
             statusClass = "win";
             colorClass = "text-win";
@@ -359,10 +394,14 @@
           : `วันที่ ${w.startDay}–${w.endDay}`;
 
         return `
-          <div class="week-box ${statusClass}">
+          <div class="week-box ${statusClass}" 
+               data-week="Week ${w.weekNum} (${monthName} ${rangeText})" 
+               data-val="${rawValAttr}" 
+               data-meta="${metaText}">
             <div class="week-title">Week ${w.weekNum}</div>
             <div class="week-range">${rangeText}</div>
             <div class="week-pnl ${colorClass}">${displayVal}</div>
+            <div class="week-meta">${metaText}</div>
           </div>
         `;
       }).join("");
@@ -514,21 +553,22 @@
       document.getElementById("winRate").textContent = `${winRate}%`;
     }
 
-    // ระบบควบคุมหน้าต่าง RPG Item Tooltip (รองรับทั้งเมาส์บนคอม และนิ้วจิ้มบนมือถือ)
+    // ระบบควบคุมหน้าต่าง RPG Item Tooltip (รองรับทั้งช่องรายวัน และกล่องรายสัปดาห์ Week)
     const tooltip = document.getElementById("gameTooltip");
-    const calendarGrid = document.getElementById("calendarGrid");
 
-    function showTooltipForCell(cell, clientX, clientY) {
-      const dateStr = cell.getAttribute("data-date");
-      const rawVal = cell.getAttribute("data-val");
+    function showTooltipForElement(el, clientX, clientY) {
+      const isWeek = el.classList.contains("week-box");
+      const headerLabel = isWeek ? el.getAttribute("data-week") : el.getAttribute("data-date");
+      const rawVal = el.getAttribute("data-val");
+      const weekMeta = el.getAttribute("data-meta");
 
       let badgeClass = "none";
       let badgeText = "ไม่มีรายการ";
-      let titleText = "สถานะพอร์ต";
+      let titleText = isWeek ? "สถานะพอร์ตรายสัปดาห์" : "สถานะพอร์ต";
       let valueText = "0.00 เหรียญ";
       let valueColor = "#94a3b8";
       let tipTheme = "";
-      let subText = "ยังไม่มีการบันทึกข้อมูลในวันนี้";
+      let subText = isWeek ? "ยังไม่มีการบันทึกข้อมูลในสัปดาห์นี้" : "ยังไม่มีการบันทึกข้อมูลในวันนี้";
 
       if (rawVal !== "none") {
         const num = parseFloat(rawVal);
@@ -537,19 +577,19 @@
         if (num > 0) {
           badgeClass = "win";
           badgeText = "✨ PROFIT";
-          titleText = "จำนวนเงินกำไรสุทธิ";
+          titleText = isWeek ? "กำไรสุทธิรวมประจำสัปดาห์" : "จำนวนเงินกำไรสุทธิ";
           valueText = `+${absFormatted} เหรียญ`;
           valueColor = "#34d399";
           tipTheme = "tip-win";
-          subText = "ปิดบวกทำกำไรเข้าพอร์ตสำเร็จ";
+          subText = isWeek ? weekMeta : "ปิดบวกทำกำไรเข้าพอร์ตสำเร็จ";
         } else if (num < 0) {
           badgeClass = "loss";
           badgeText = "💀 LOSS";
-          titleText = "จำนวนเงินติดลบสุทธิ";
+          titleText = isWeek ? "ขาดทุนสุทธิรวมประจำสัปดาห์" : "จำนวนเงินติดลบสุทธิ";
           valueText = `-${absFormatted} เหรียญ`;
           valueColor = "#f87171";
           tipTheme = "tip-loss";
-          subText = "ปิดลบขาดทุนในรอบวันนี้";
+          subText = isWeek ? weekMeta : "ปิดลบขาดทุนในรอบวันนี้";
         } else {
           badgeClass = "flat";
           badgeText = "⚖️ EVEN";
@@ -557,14 +597,14 @@
           valueText = "0.00 เหรียญ";
           valueColor = "#cbd5e1";
           tipTheme = "tip-flat";
-          subText = "เสมอตัว (ไม่กำไรไม่ขาดทุน)";
+          subText = isWeek ? weekMeta : "เสมอตัว (ไม่กำไรไม่ขาดทุน)";
         }
       }
 
       tooltip.className = `game-tooltip show ${tipTheme}`;
       tooltip.innerHTML = `
         <div class="gt-header">
-          <span>📅 ${dateStr}</span>
+          <span>${isWeek ? "📊" : "📅"} ${headerLabel}</span>
           <span class="gt-badge ${badgeClass}">${badgeText}</span>
         </div>
         <div class="gt-body">
@@ -590,28 +630,24 @@
       tooltip.style.top = `${top}px`;
     }
 
-    // 1. สำหรับคอมพิวเตอร์ (เลื่อนเมาส์ชี้)
-    calendarGrid.addEventListener("mousemove", (e) => {
-      const cell = e.target.closest(".day-cell:not(.empty)");
-      if (!cell) {
+    // 1. สำหรับคอมพิวเตอร์ (เลื่อนเมาส์ชี้ได้ทั้งช่องวัน และกล่อง Week)
+    document.addEventListener("mousemove", (e) => {
+      const targetEl = e.target.closest(".day-cell:not(.empty), .week-box");
+      if (!targetEl) {
         tooltip.classList.remove("show");
         return;
       }
-      showTooltipForCell(cell, e.clientX, e.clientY);
+      showTooltipForElement(targetEl, e.clientX, e.clientY);
     });
 
-    calendarGrid.addEventListener("mouseleave", () => {
-      tooltip.classList.remove("show");
-    });
-
-    // 2. สำหรับมือถือและแท็บเล็ต (จิ้มที่ช่องเพื่อเปิด / จิ้มพื้นที่ว่างเพื่อปิด)
+    // 2. สำหรับมือถือและแท็บเล็ต (จิ้มที่ช่องวันหรือกล่อง Week เพื่อเปิด / จิ้มพื้นที่ว่างเพื่อปิด)
     document.addEventListener("click", (e) => {
-      const cell = e.target.closest(".day-cell:not(.empty)");
-      if (cell) {
-        const rect = cell.getBoundingClientRect();
+      const targetEl = e.target.closest(".day-cell:not(.empty), .week-box");
+      if (targetEl) {
+        const rect = targetEl.getBoundingClientRect();
         const tapX = e.clientX || (rect.left + rect.width / 2);
         const tapY = e.clientY || (rect.top + rect.height / 2);
-        showTooltipForCell(cell, tapX, tapY);
+        showTooltipForElement(targetEl, tapX, tapY);
       } else {
         tooltip.classList.remove("show");
       }
