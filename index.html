@@ -39,7 +39,9 @@
     input:checked + .slider:before { transform: translateX(18px); }
     
     .stats-bar { max-width: 1440px; margin: 0 auto 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-    .stat-box { background: var(--card); border: 1px solid var(--border); padding: 16px; border-radius: 12px; }
+    .stat-box { background: var(--card); border: 1px solid var(--border); padding: 16px; border-radius: 12px; transition: all 0.25s ease; }
+    .stat-box.eq-win { background: var(--win-bg); border-color: rgba(52, 211, 153, 0.45); box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15); }
+    .stat-box.eq-loss { background: var(--loss-bg); border-color: rgba(248, 113, 113, 0.45); box-shadow: 0 4px 16px rgba(239, 68, 68, 0.15); }
     .stat-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
     .stat-value { font-size: 1.4rem; font-weight: 700; }
 
@@ -231,6 +233,14 @@
       <div class="stat-label">อัตราชนะรายวัน (Win Rate)</div>
       <div class="stat-value" id="winRate">0%</div>
     </div>
+    <div class="stat-box">
+      <div class="stat-label">Balance (C)</div>
+      <div class="stat-value" id="accountBalance">0.00</div>
+    </div>
+    <div class="stat-box" id="equityBox">
+      <div class="stat-label">Equity (E)</div>
+      <div class="stat-value" id="accountEquity">0.00</div>
+    </div>
   </div>
 
   <div id="loader">กำลังโหลดข้อมูลจาก Profit Calendar...</div>
@@ -243,7 +253,7 @@
   <div id="gameTooltip" class="game-tooltip"></div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbxQVjEqDQbWK9hYWohWNNF-jgY6M2rDMHevI6VOiGGbDMheme5rxPVinZW9z4uPZGk-/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycby7x1eTno-eLfOJOKDYWMrcHvi-qHzYhx2iRn_blCYwzueWIxOSXrnz_TYV-ZoyTPtr/exec";
 
     const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
@@ -551,6 +561,28 @@
       const totalActiveDays = totalWins + totalLosses;
       const winRate = totalActiveDays > 0 ? ((totalWins / totalActiveDays) * 100).toFixed(1) : 0;
       document.getElementById("winRate").textContent = `${winRate}%`;
+
+      // อัปเดต Balance (C) และ Equity (E) พร้อมลูกเล่นเปลี่ยนสีเขียว/แดง
+      const acc = sheetData._account || { balance: 0, equity: 0 };
+      const balVal = Number(acc.balance) || 0;
+      const eqVal = Number(acc.equity) || 0;
+
+      document.getElementById("accountBalance").textContent = balVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      const eqEl = document.getElementById("accountEquity");
+      const eqBox = document.getElementById("equityBox");
+      eqEl.textContent = eqVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      if (eqVal > balVal) {
+        eqEl.className = "stat-value text-win";
+        eqBox.className = "stat-box eq-win";
+      } else if (eqVal < balVal) {
+        eqEl.className = "stat-value text-loss";
+        eqBox.className = "stat-box eq-loss";
+      } else {
+        eqEl.className = "stat-value";
+        eqBox.className = "stat-box";
+      }
     }
 
     // ระบบควบคุมหน้าต่าง RPG Item Tooltip (รองรับทั้งช่องรายวัน และกล่องรายสัปดาห์ Week)
